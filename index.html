@@ -250,8 +250,8 @@ function render() {
   const app = document.getElementById('app');
   if (!S.role) { app.innerHTML = loginView(); return; }
   const body = tab === 'board' ? boardView() : tab === 'log' ? logView() : settingsView();
-  // 状況画面では空床の直下に、履歴・設定の画面では見出しの直下にメニューを置く
-  app.innerHTML = `<div class="demo-strip">試作品：表示はすべて見本データです</div>` + (tab === 'board' ? body : navView() + body);
+  // メニュー（状況・履歴・設定）は各画面の一番下に置く（状況画面は凡例の下）
+  app.innerHTML = `<div class="demo-strip">試作品：表示はすべて見本データです</div>` + body + (tab === 'board' ? '' : navView());
 }
 
 function loginView() {
@@ -341,9 +341,8 @@ function boardView() {
   }
   h += `</div></div>`;
 
-  h += navView();
-
   h += `<div class="legend">● 緑＝余裕　▲ 黄＝要注意　✕ 赤＝不可・満床　－ 灰＝未更新<br>未更新＝定時（${TEIJI.join('・')}時）から${GRACE_MIN}分過ぎても更新なし<br>空き床数：0床＝赤・1床＝黄・2床以上＝緑（仮）<br>予定の状態：検討中＝青・決定＝黄・実施中＝赤／「要確認」＝更新から3時間以上</div>`;
+  h += navView();
   return h;
 }
 
