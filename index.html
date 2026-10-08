@@ -1,0 +1,582 @@
+<title>当直ボード（試作）</title>
+<meta name="apple-mobile-web-app-title" content="当直ボード">
+<style>
+/* 1画面ボード：上から お知らせ → ER・処置 → 空床。信号色は意味の色、アクセントは青 */
+:root{
+  --bg:#f3f4f6; --card:#ffffff; --text:#1a1d23; --sub:#5f6672; --line:#e3e5e9;
+  --g:#1f9d55; --g-bg:#e6f6ec; --y:#b07d00; --y-bg:#fff5d6; --r:#d23b3b; --r-bg:#fde8e8;
+  --s:#7d838e; --s-bg:#eceef1; --accent:#1d5fbf; --accent-bg:#e7effb; --warn-bg:#fff3e0; --warn:#a85b00;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1115; --card:#1a1d24; --text:#eef0f3; --sub:#9aa1ad; --line:#2b2f38;
+    --g:#3ccf7a; --g-bg:#123222; --y:#f2c335; --y-bg:#352b0c; --r:#ff6b6b; --r-bg:#3a1717;
+    --s:#8a909b; --s-bg:#262a32; --accent:#7fb0ff; --accent-bg:#17253d; --warn-bg:#33240f; --warn:#ffb85c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --card:#1a1d24; --text:#eef0f3; --sub:#9aa1ad; --line:#2b2f38;
+  --g:#3ccf7a; --g-bg:#123222; --y:#f2c335; --y-bg:#352b0c; --r:#ff6b6b; --r-bg:#3a1717;
+  --s:#8a909b; --s-bg:#262a32; --accent:#7fb0ff; --accent-bg:#17253d; --warn-bg:#33240f; --warn:#ffb85c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;font-size:15px;line-height:1.4;-webkit-text-size-adjust:100%}
+.app{max-width:460px;margin:0 auto;min-height:100vh;padding:0 16px calc(70px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.demo-strip{background:var(--accent-bg);color:var(--accent);font-size:11px;text-align:center;padding:4px 8px;margin:0 -16px;font-weight:600}
+.err{font-size:13px;color:var(--r);font-weight:700;margin-top:8px}
+header{display:flex;justify-content:space-between;align-items:flex-end;padding:8px 2px 6px}
+header h1{font-size:19px;font-weight:800;letter-spacing:.02em}
+header .who{font-size:11px;color:var(--sub)}
+header .clock{text-align:right}
+header .clock b{font-size:21px;font-variant-numeric:tabular-nums}
+header .clock div{font-size:11px;color:var(--sub)}
+.notice{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:6px 10px;margin-bottom:6px;font-size:13px}
+.notice .meta{font-size:10.5px;opacity:.85}
+.due{background:var(--r-bg);color:var(--r);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.due button{background:var(--r);color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;white-space:nowrap}
+.card{background:var(--card);border-radius:12px;padding:0 10px;margin-bottom:6px;border:1px solid var(--line)}
+.card h2{font-size:12px;color:var(--sub);font-weight:700;padding:6px 0 0;display:flex;justify-content:space-between;gap:6px}
+.card h2 span{font-weight:400;font-size:11px}
+.row{display:grid;grid-template-columns:62px minmax(0,1fr);gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.card h2 + .row{border-top:none}
+.row .name{font-weight:800;font-size:15px}
+.row .detail{font-size:11.5px;color:var(--sub);margin-top:2px}
+.row .note{font-size:11.5px;color:var(--sub)}
+.mine{cursor:pointer}
+.row.mine .name::after{content:"更新 ›";display:block;font-size:11px;color:var(--accent);font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 11px 3px 9px;font-weight:800;font-size:14.5px}
+.chip.g,.tile.g,.mini.g{background:var(--g-bg);color:var(--g)}
+.chip.y,.tile.y,.mini.y{background:var(--y-bg);color:var(--y)}
+.chip.r,.tile.r,.mini.r{background:var(--r-bg);color:var(--r)}
+.chip.s,.tile.s,.mini.s{background:var(--s-bg);color:var(--s)}
+/* ER：3区画 */
+.er-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr);gap:5px}
+.mini{border-radius:9px;padding:4px 6px;text-align:center}
+.mini .t{font-size:11px;font-weight:800}
+.mini .v{font-size:14px;font-weight:800;line-height:1.25}
+.mini .v b{font-size:20px}
+.mini .w{font-size:10.5px;font-weight:600;opacity:.9}
+.mini.key{outline:2px solid currentColor;outline-offset:-2px}
+/* 空床 */
+.beds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:4px 0 8px}
+.tile{border-radius:9px;padding:3px 2px;text-align:center}
+.tile .t{font-size:11px;font-weight:700}
+.tile .n{font-size:20px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
+.tile .n small{font-size:10px;font-weight:600;margin-left:1px}
+.legend{font-size:10px;color:var(--sub);text-align:center;padding:0 0 8px;line-height:1.55}
+/* 搬送・手術・治療の予定 */
+.addbtn{color:var(--accent);font-weight:800;font-size:12px;padding:2px 4px}
+.empty{font-size:12px;color:var(--sub);padding:8px 0 10px}
+.plan{padding:7px 0;border-top:1px solid var(--line);cursor:pointer}
+.card h2 + .plan{border-top:none}
+.plan .l1{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.plan .kind{font-size:11px;font-weight:800;color:var(--accent);background:var(--accent-bg);border-radius:6px;padding:1px 6px}
+.plan .what{font-weight:800;font-size:14.5px;min-width:0}
+.pst{font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;margin-left:auto}
+.pst.k{background:var(--accent-bg);color:var(--accent)}
+.pst.y{background:var(--y-bg);color:var(--y)}
+.pst.r{background:var(--r-bg);color:var(--r)}
+.plan .l2{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.plan .tag{font-size:11px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--text)}
+.plan .tag.when{border-color:var(--y);color:var(--y)}
+.plan .old{font-size:11px;font-weight:800;color:var(--s);background:var(--s-bg);border-radius:6px;padding:0 6px}
+.plan .detail{font-size:11px;color:var(--sub);margin-top:2px}
+.seg.wrap3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.seg button.tg{font-size:14px;padding:11px 2px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;max-width:153px;padding:7px 0 8px;font-size:11px;color:var(--sub);font-weight:600}
+nav button b{display:block;font-size:18px;line-height:1.2}
+nav button.on{color:var(--accent)}
+.fab{position:fixed;right:max(14px,calc(50% - 216px));bottom:calc(64px + env(safe-area-inset-bottom));background:var(--accent);color:#fff;border-radius:999px;padding:10px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+/* 入力シート */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.sheet{background:var(--card);width:100%;max-width:460px;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.sheet h3{font-size:18px;margin-bottom:2px}
+.sheet .hint{font-size:12px;color:var(--sub);margin-bottom:8px}
+.sheet label.l{display:block;font-size:13px;font-weight:800;color:var(--sub);margin:14px 0 6px}
+.sheet label.l.key{color:var(--r)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.seg.four{grid-template-columns:repeat(4,1fr)}
+.seg button{border:2px solid var(--line);border-radius:12px;padding:13px 4px;font-weight:800;font-size:15px;background:var(--bg)}
+.seg button.on.g{border-color:var(--g);background:var(--g-bg);color:var(--g)}
+.seg button.on.y{border-color:var(--y);background:var(--y-bg);color:var(--y)}
+.seg button.on.r{border-color:var(--r);background:var(--r-bg);color:var(--r)}
+.seg button.on.n{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+.stepper{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)}
+.stepper .t{font-weight:700}
+.stepper .ctl{display:flex;align-items:center;gap:10px}
+.stepper .ctl button{width:44px;height:44px;border-radius:12px;background:var(--bg);border:1px solid var(--line);font-size:22px;font-weight:700}
+.stepper .ctl b{min-width:34px;text-align:center;font-size:22px;font-variant-numeric:tabular-nums}
+.stepper.changed .t::after{content:" ●変更";color:var(--accent);font-size:11px}
+input[type=text],textarea{width:100%;font:inherit;font-size:16px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+textarea{min-height:72px;resize:vertical}
+.btns{display:grid;gap:8px;margin-top:18px}
+.btn{border-radius:12px;padding:14px;font-weight:800;font-size:16px;text-align:center}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.ghost{background:var(--bg);border:1px solid var(--line)}
+.btn.plain{color:var(--sub);font-weight:600;font-size:14px;padding:8px}
+.caution{font-size:12px;color:var(--r);margin-top:6px}
+/* ログイン */
+.login{padding-top:40px}
+.login h1{font-size:26px;font-weight:800;text-align:center}
+.login p.lead{text-align:center;color:var(--sub);font-size:13px;margin:4px 0 22px}
+.login .field{margin-bottom:10px}
+.login .field input:disabled{opacity:.6}
+.login .roles{display:grid;gap:8px;margin-top:8px}
+.login .roles button{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;text-align:left;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.login .roles button span{font-weight:400;font-size:12px;color:var(--sub)}
+/* 履歴・設定 */
+.log{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:2px 12px;margin-bottom:12px}
+.log div.e{padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.log div.e:first-child{border-top:none}
+.log .e .tm{font-size:12px;color:var(--sub)}
+.section-title{font-size:13px;color:var(--sub);font-weight:700;margin:14px 2px 6px}
+.set{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 12px;margin-bottom:12px}
+.set .it{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line);gap:10px}
+.set .it:first-child{border-top:none}
+.set .it button{color:var(--accent);font-weight:700;white-space:nowrap}
+.set p{font-size:13px;color:var(--sub);padding:10px 0}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div id="sheetRoot"></div>
+
+<script>
+/* ===== 設定（試作品の仮置き） ===== */
+const TEIJI = [17, 0, 6];            // 定時更新の時刻
+const GRACE_MIN = 30;                // 定時から何分で「未更新」にするか
+const BED_UNITS = [
+  { group: '残り病床数', units: ['E-ICU', 'G-ICU', 'HCU', '救急病棟', '他病棟'] },
+];
+const ITEMS = {
+  er:    { name: 'ER',       labels: { g: '余裕',   y: '混雑',     r: '受入困難' }, er: true },
+  or:    { name: '手術室',   labels: { g: 'すぐ可', y: '待ちあり', r: '不可' }, wait: true },
+  angio: { name: 'アンギオ', labels: { g: 'すぐ可', y: '待ちあり', r: '不可' }, wait: true },
+  endo:  { name: '内視鏡',   labels: { g: '対応可', y: '待ちあり', r: '不可' }, wait: true },
+};
+const WAITS = ['30分', '1時間', '2時間', '3時間以上'];
+const SYM = { g: '●', y: '▲', r: '✕', s: '－' };
+const ROLES = {
+  doctor: { name: '当直医',               short: '当直医',        edits: [],                notice: false, sub: '見る＋予定を入力' },
+  nurse:  { name: '当直師長',             short: '当直師長',      edits: ['beds', 'er', 'or', 'angio', 'endo'], notice: true,  sub: '全項目を変更可' },
+  er:     { name: 'ER看護師・救急科',     short: 'ER',            edits: ['er'],            notice: true,  sub: 'ERを入力' },
+  ope:    { name: '手術室看護師',         short: '手術室看護師',  edits: ['or'],            notice: true,  sub: '手術室を入力' },
+  endo:   { name: '内視鏡センター看護師', short: '内視鏡C看護師', edits: ['angio', 'endo'], notice: true,  sub: 'アンギオ・内視鏡を入力' },
+};
+const KEY = 'toutyoku-board-demo-v6';
+const KINDS = ['搬送予定', '手術', 'カテーテル', '内視鏡'];
+const RES = { or: '手術室', angio: 'アンギオ', endo: '内視鏡', b3: '3次ベッド', icu: 'ICU系' };
+const WHENS = ['すぐ', '1時間以内', '今夜中', '未定'];
+const PSTAT = { '検討中': 'k', '決定': 'y', '実施中': 'r' };
+const PLAN_OLD_MIN = 180;            // 更新から3時間たった予定に「要確認」を付ける
+const MIN = 60000;
+
+/* ===== 状態 ===== */
+let S = load() || seed();
+let tab = 'board';
+
+function now() { return Date.now() + (S.offset || 0); }
+function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+function seed(keepRole) {
+  const t = Date.now();
+  const T = lastTeiji(t);
+  const ago = m => t - m * MIN;
+  const st = {
+    role: keepRole || null, offset: 0,
+    items: {
+      // ER：b3＝3次ベッドの空き床数、l2/w2＝2次の状態と待ち人数、l1/w1＝1次の状態と待ち人数
+      er:    { b3: 1, b2: 2, b1: 3, note: '', at: ago(4), by: 'ER' },
+      or:    { level: 'g', wait: null, note: '', at: ago(18), by: '手術室看護師' },
+      angio: { level: 'y', wait: '1時間', note: '心カテ1件施行中', at: ago(9), by: '内視鏡C看護師' },
+      endo:  { level: 'g', wait: null, note: '', at: ago(9), by: '内視鏡C看護師' },
+    },
+    beds: { n: { 'E-ICU': 1, 'G-ICU': 0, 'HCU': 2, '救急病棟': 3, '他病棟': 8 },
+            at: ago(22), by: '当直師長' },
+    notices: [ { text: '電子カルテ定期メンテナンス 2:00〜3:00（紙運用）', at: ago(25), by: '当直師長' } ],
+    plans: [
+      { kind: '搬送予定', text: '大動脈解離', dept: '心臓血管外科', res: ['b3', 'or'], when: '1時間以内', status: '決定', at: ago(12), by: '当直医', owner: 'doctor' },
+      { kind: '手術',     text: '腹膜炎（手術検討中）', dept: '消化器外科', res: ['or', 'icu'], when: '今夜中', status: '検討中', at: ago(35), by: '当直医', owner: 'doctor' },
+      { kind: '手術',     text: '術後の再手術を計画中（入院中）', dept: '消化器外科', res: ['or'], when: '未定', status: '検討中', at: ago(200), by: '当直医', owner: 'doctor' },
+    ],
+    log: [],
+  };
+  // 見本：内視鏡だけ前回の定時を過ぎても更新されていない状態にしておく
+  st.items.endo.at = T - 90 * MIN;
+  st.log = [
+    { at: ago(4),  by: 'ER', text: 'ER：空き床 3次 1床／2次 2床／1次 3床' },
+    { at: ago(9),  by: '内視鏡C看護師', text: 'アンギオ：待ちあり（約1時間）／心カテ1件施行中' },
+    { at: ago(18), by: '手術室看護師', text: '手術室：すぐ可' },
+    { at: ago(22), by: '当直師長', text: '空床：E-ICU 1・G-ICU 0・HCU 2・救急病棟 3・他病棟 8' },
+    { at: ago(25), by: '当直師長', text: 'お知らせ：電子カルテ定期メンテナンス 2:00〜3:00（紙運用）' },
+  ];
+  return st;
+}
+
+/* ===== 時刻まわり ===== */
+function teijiCandidates(t, days) {
+  const out = [];
+  for (const d of days) for (const h of TEIJI) {
+    const c = new Date(t); c.setDate(c.getDate() + d); c.setHours(h, 0, 0, 0); out.push(c.getTime());
+  }
+  return out;
+}
+function lastTeiji(t) { return Math.max(...teijiCandidates(t, [-1, 0]).filter(c => c <= t)); }
+function nextTeiji(t) { return Math.min(...teijiCandidates(t, [0, 1]).filter(c => c > t)); }
+function isStale(at) { const n = now(), T = lastTeiji(n); return n - T >= GRACE_MIN * MIN && at < T; }
+function hm(t) { const d = new Date(t); return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function stamp(t) {
+  const d = new Date(t), n = new Date(now());
+  return d.toDateString() === n.toDateString() ? hm(t) : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm(t);
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function bedLevel(n) { return n <= 0 ? 'r' : n === 1 ? 'y' : 'g'; }
+function erText(e) {
+  return `空き床 3次 ${e.b3}床／2次 ${e.b2}床／1次 ${e.b1}床`;
+}
+
+/* ===== 画面 ===== */
+function render() {
+  const app = document.getElementById('app');
+  if (!S.role) { app.innerHTML = loginView(); return; }
+  const body = tab === 'board' ? boardView() : tab === 'log' ? logView() : settingsView();
+  app.innerHTML = `<div class="demo-strip">試作品：表示はすべて見本データです</div>` + body + navView() + fabView();
+}
+
+function loginView() {
+  return `<div class="demo-strip">試作品：表示はすべて見本データです</div>
+  <div class="login">
+    <h1>当直ボード</h1>
+    <p class="lead">当直帯の院内状況共有（試作）</p>
+    <div class="field"><input type="text" placeholder="職員ID" disabled></div>
+    <div class="field"><input type="text" placeholder="パスワード" disabled></div>
+    <p style="font-size:12px;color:var(--sub);margin:4px 2px 14px">本番では職員ごとのIDでログインします。試作品では入力不要です。下から役割を選んでください。</p>
+    <div class="roles">
+      ${Object.entries(ROLES).map(([k, r]) => `<button onclick="login('${k}')">${r.name}<span>${r.sub} ›</span></button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function erRow(mine) {
+  const e = S.items.er, L = ITEMS.er.labels, stale = isStale(e.at);
+  const lv = x => stale ? 's' : x;
+  const area = (t, n) => `<div class="mini ${lv(bedLevel(n))}"><div class="t">${t}</div><div class="v">空き <b>${n}</b>床</div></div>`;
+  return `<div class="row ${mine ? 'mine' : ''}" ${mine ? `onclick="openEdit('er')"` : ''}>
+    <div class="name">ER</div>
+    <div>
+      ${stale ? `<span class="chip s" style="margin-bottom:4px">${SYM.s} 未更新（前回の値を灰色で表示）</span>` : ''}
+      <div class="er-grid">
+        <div class="mini key ${lv(bedLevel(e.b3))}"><div class="t">3次ベッド</div><div class="v">空き <b>${e.b3}</b>床</div><div class="w">重症の受け皿</div></div>
+        ${area('2次', e.b2)}
+        ${area('1次', e.b1)}
+      </div>
+      <div class="detail">${stamp(e.at)}・${esc(e.by)}</div>
+      ${e.note && !stale ? `<div class="note">「${esc(e.note)}」</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function boardView() {
+  const n = now(), role = ROLES[S.role];
+  const mine = k => role.edits.includes(k);
+  const dueKey = role.edits.find(k => isStale(k === 'beds' ? S.beds.at : S.items[k].at));
+  const dueMine = !!dueKey;
+
+  let h = `<header>
+    <div><h1>院内状況</h1><div class="who">${esc(role.name)}でログイン中</div></div>
+    <div class="clock"><b>${hm(n)}</b><div>次の定時更新 ${hm(nextTeiji(n))}</div></div>
+  </header>`;
+
+  if (S.role === 'nurse') {
+    const stale = role.edits.filter(k => isStale(k === 'beds' ? S.beds.at : S.items[k].at));
+    if (stale.length) h += `<div class="due" style="flex-direction:column;align-items:stretch;gap:6px">
+      <span>未更新 ${stale.length}件　担当に電話で確認し、代行入力できます</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${stale.map(k => `<button onclick="openEdit('${k}')">${k === 'beds' ? '空床' : ITEMS[k].name}を更新</button>`).join('')}</div></div>`;
+  } else if (dueMine) h += `<div class="due"><span>定時更新の時間です。担当項目を確認してください</span><button onclick="openEdit('${dueKey}')">更新</button></div>`;
+
+  for (const nt of S.notices) {
+    h += `<div class="notice">⚠ ${esc(nt.text)}<div class="meta">${esc(nt.by)}　${stamp(nt.at)}</div></div>`;
+  }
+
+  h += plansCard();
+
+  h += `<div class="card"><h2>救急外来・処置<span>判断材料です（受入判断は各医師）</span></h2>`;
+  h += erRow(mine('er'));
+  for (const k of ['or', 'angio', 'endo']) {
+    const it = S.items[k], def = ITEMS[k], stale = isStale(it.at);
+    const lv = stale ? 's' : it.level;
+    const chip = stale ? `${SYM.s} 未更新` : `${SYM[lv]} ${def.labels[lv]}`;
+    const wait = it.level === 'y' && it.wait ? `待ち 約${it.wait}` : '';
+    const prev = stale ? `前回：${def.labels[it.level]}${wait ? '・' + wait : ''}　` : (wait ? wait + '　' : '');
+    h += `<div class="row ${mine(k) ? 'mine' : ''}" ${mine(k) ? `onclick="openEdit('${k}')"` : ''}>
+      <div class="name">${def.name}</div>
+      <div>
+        <span class="chip ${lv}">${chip}</span>
+        <div class="detail">${esc(prev)}${stamp(it.at)}・${esc(it.by)}${it.note && !stale ? `　「${esc(it.note)}」` : ''}</div>
+      </div>
+    </div>`;
+  }
+  h += `</div>`;
+
+  const bStale = isStale(S.beds.at);
+  h += `<div class="card ${mine('beds') ? 'mine' : ''}" ${mine('beds') ? `onclick="openEdit('beds')"` : ''}>
+    <h2>空床<span>${bStale ? '未更新・' : ''}${stamp(S.beds.at)}・${esc(S.beds.by)}${mine('beds') ? '　<b style="color:var(--accent)">更新 ›</b>' : ''}</span></h2>
+    <div class="beds">`;
+  for (const g of BED_UNITS) {
+    for (const u of g.units) {
+      const v = S.beds.n[u], lv = bStale ? 's' : bedLevel(v);
+      h += `<div class="tile ${lv}"><div class="t">${u}</div><div class="n">${v}<small>床</small></div></div>`;
+    }
+  }
+  h += `</div></div>`;
+
+  h += `<div class="legend">● 緑＝余裕　▲ 黄＝要注意　✕ 赤＝不可・満床　－ 灰＝未更新<br>未更新＝定時（${TEIJI.join('・')}時）から${GRACE_MIN}分過ぎても更新なし<br>空き床数：0床＝赤・1床＝黄・2床以上＝緑（仮）<br>予定の状態：検討中＝青・決定＝黄・実施中＝赤／「要確認」＝更新から3時間以上</div>`;
+  return h;
+}
+
+function plansCard() {
+  let h = `<div class="card"><h2>搬送・手術・治療の予定<span><button class="addbtn" onclick="openPlan(-1)">＋ 追加</button></span></h2>`;
+  if (!S.plans.length) h += `<div class="empty">予定はありません。資源を使いそうなものがあれば「＋ 追加」から入力してください</div>`;
+  S.plans.forEach((p, i) => {
+    const old = now() - p.at > PLAN_OLD_MIN * MIN;
+    h += `<div class="plan" onclick="openPlan(${i})">
+      <div class="l1"><span class="kind">${p.kind}</span><span class="what">${esc(p.text)}</span><span class="pst ${PSTAT[p.status]}">${p.status}</span></div>
+      <div class="l2">${p.res.map(r => `<span class="tag">${RES[r]}</span>`).join('')}<span class="tag when">${p.when}</span>${old ? '<span class="old">要確認</span>' : ''}</div>
+      <div class="detail">${esc(p.dept || '')}　${stamp(p.at)}・${esc(p.by)}</div>
+    </div>`;
+  });
+  return h + `</div>`;
+}
+
+function logView() {
+  let h = `<header><div><h1>入力履歴</h1><div class="who">誰が・いつ・何を更新したか</div></div></header><div class="log">`;
+  if (!S.log.length) h += `<div class="e">まだ履歴はありません</div>`;
+  for (const e of S.log) h += `<div class="e"><div class="tm">${stamp(e.at)}　${esc(e.by)}</div>${esc(e.text)}</div>`;
+  return h + `</div>`;
+}
+
+function settingsView() {
+  const role = ROLES[S.role];
+  return `<header><div><h1>設定</h1><div class="who">${esc(role.name)}でログイン中</div></div></header>
+  <div class="set">
+    <div class="it"><span>表示の明るさ</span><button onclick="toggleTheme()">${themeLabel()}</button></div>
+    <div class="it"><span>ログアウト（役割を選び直す）</span><button onclick="logout()">ログアウト</button></div>
+  </div>
+  <div class="section-title">デモ操作（会議での説明用）</div>
+  <div class="set">
+    <div class="it"><span>時計を1時間進める<br><small style="color:var(--sub)">いま ${hm(now())}${S.offset ? '（' + Math.round(S.offset / 3600000) + '時間進めています）' : ''}</small></span><button onclick="advance()">＋1時間</button></div>
+    <div class="it"><span>見本データに戻す</span><button onclick="resetDemo()">戻す</button></div>
+    <p>時計を進めると、定時を過ぎても更新されていない項目が灰色の「未更新」に変わる様子を確認できます。</p>
+  </div>`;
+}
+
+function navView() {
+  const b = (k, icon, label) => `<button class="${tab === k ? 'on' : ''}" onclick="go('${k}')"><b>${icon}</b>${label}</button>`;
+  return `<nav>${b('board', '▦', '状況')}${b('log', '☰', '履歴')}${b('settings', '⚙', '設定')}</nav>`;
+}
+
+function fabView() {
+  const role = ROLES[S.role];
+  if (tab !== 'board' || !role.notice) return '';
+  return `<button class="fab" onclick="openNotice()">＋ お知らせ</button>`;
+}
+
+/* ===== 入力シート ===== */
+let D = null; // 入力中の下書き
+
+function openEdit(k) {
+  if (k === 'beds') D = { k, n: { ...S.beds.n } };
+  else D = { k, ...S.items[k], note: S.items[k].note || '' };
+  renderSheet();
+}
+
+function stepRow(label, f) {
+  return `<div class="stepper"><span class="t">${label}</span><span class="ctl"><button onclick="num('${f}',-1)">－</button><b>${D[f]}</b><button onclick="num('${f}',1)">＋</button></span></div>`;
+}
+function segRow(f, labels) {
+  return `<div class="seg">${['g', 'y', 'r'].map(l => `<button class="${D[f] === l ? 'on ' + l : ''}" onclick="setD('${f}','${l}')">${SYM[l]} ${labels[l]}</button>`).join('')}</div>`;
+}
+
+function renderSheet() {
+  const root = document.getElementById('sheetRoot');
+  if (!D) { root.innerHTML = ''; return; }
+  let h = `<div class="overlay" onclick="if(event.target===this)closeSheet()"><div class="sheet">`;
+
+  if (D.k === 'plan') {
+    const one = (f, opts) => `<div class="seg wrap3">${opts.map(o => `<button class="tg ${D[f] === o ? 'on n' : ''}" onclick="setD('${f}','${o}')">${o}</button>`).join('')}</div>`;
+    h += `<h3>${D.idx < 0 ? '予定を追加' : '予定を更新'}</h3><div class="hint">医療資源を使いそうなものを入れます。決まっていなくても構いません</div>
+      <label class="l">種別</label>${one('kind', KINDS)}
+      <label class="l">内容（短く）</label><input type="text" id="ptext" value="${esc(D.text)}" placeholder="例：腹膜炎（手術検討中）">
+      <div class="caution">氏名・ID・年齢・性別など、患者さんが特定できる内容は書かないでください</div>
+      <label class="l">診療科</label><input type="text" id="pdept" value="${esc(D.dept)}" placeholder="例：消化器外科">
+      <label class="l">使いそうな資源（複数選択可）</label>
+      <div class="seg wrap3">${Object.entries(RES).map(([k, v]) => `<button class="tg ${D.res.includes(k) ? 'on n' : ''}" onclick="togRes('${k}')">${v}</button>`).join('')}</div>
+      <label class="l">時期</label>${one('when', WHENS)}
+      <label class="l">状態</label>${one('status', Object.keys(PSTAT))}
+      ${D.err ? `<div class="err">${D.err}</div>` : ''}
+      <div class="btns">
+        <button class="btn primary" onclick="commitPlan()">${D.idx < 0 ? '追加する' : '更新する'}</button>
+        ${D.idx < 0 ? '' : canDelete(S.plans[D.idx])
+          ? `<button class="btn ghost" onclick="endPlan()">終了・取り消し（一覧から外す）</button>`
+          : `<div class="hint" style="text-align:center">一覧から外せるのは、記入した本人と当直師長です</div>`}
+        <button class="btn plain" onclick="closeSheet()">やめる</button>
+      </div>`;
+  } else if (D.k === 'notice') {
+    h += `<h3>お知らせを出す</h3><div class="hint">全員の画面の一番上に表示されます</div>
+      <textarea id="nt" placeholder="例：多数傷病者受入中のためER受入制限">${esc(D.text || '')}</textarea>
+      <div class="caution">患者さんが特定できる内容（氏名・ID・年齢＋病名など）は書かないでください</div>`;
+    if (S.notices.length) {
+      h += `<label class="l">表示中のお知らせ</label>`;
+      S.notices.forEach((nt, i) => {
+        h += `<div class="stepper"><span style="font-size:14px">${esc(nt.text)}</span><button class="btn plain" onclick="removeNotice(${i})">取り下げ</button></div>`;
+      });
+    }
+    h += `<div class="btns"><button class="btn primary" onclick="postNotice()">表示する</button><button class="btn plain" onclick="closeSheet()">閉じる</button></div>`;
+  } else if (D.k === 'beds') {
+    h += `<h3>空床を更新</h3><div class="hint">変わった病棟だけ ＋／－ で直してください</div>`;
+    for (const g of BED_UNITS) {
+      h += `<label class="l">${g.group}</label>`;
+      for (const u of g.units) {
+        const changed = D.n[u] !== S.beds.n[u];
+        h += `<div class="stepper ${changed ? 'changed' : ''}"><span class="t">${u}</span><span class="ctl">
+          <button onclick="bed('${u}',-1)">－</button><b>${D.n[u]}</b><button onclick="bed('${u}',1)">＋</button></span></div>`;
+      }
+    }
+    h += sheetButtons();
+  } else if (D.k === 'er') {
+    const L = ITEMS.er.labels;
+    h += `<h3>ERの状況を更新</h3><div class="hint">変わったところだけ直して「更新する」を押してください</div>
+      <label class="l key">3次ベッド（重症）の空き</label>${stepRow('空き床数', 'b3')}
+      <label class="l">2次ベッドの空き</label>${stepRow('空き床数', 'b2')}
+      <label class="l">1次ベッドの空き</label>${stepRow('空き床数', 'b1')}
+      <label class="l">ひとこと（任意）</label><input type="text" id="note" value="${esc(D.note)}" placeholder="例：CPA対応中">
+      <div class="caution">患者さんが特定できる内容は書かないでください</div>`;
+    h += sheetButtons();
+  } else {
+    const def = ITEMS[D.k];
+    h += `<h3>${def.name}の状況を更新</h3><div class="hint">選んで「更新する」を押すだけです</div>${segRow('level', def.labels)}`;
+    if (D.level === 'y') {
+      h += `<label class="l">待ち時間の見込み</label>
+        <div class="seg four">${WAITS.map(w => `<button class="${D.wait === w ? 'on n' : ''}" onclick="setD('wait','${w}')">${w}</button>`).join('')}</div>
+        ${D.err ? `<div class="err">${D.err}</div>` : ''}`;
+    }
+    h += `<label class="l">ひとこと（任意）</label><input type="text" id="note" value="${esc(D.note)}" placeholder="例：心カテ1件施行中">
+      <div class="caution">患者さんが特定できる内容は書かないでください</div>`;
+    h += sheetButtons();
+  }
+  root.innerHTML = h + `</div></div>`;
+}
+
+function sheetButtons() {
+  return `<div class="btns">
+    <button class="btn primary" onclick="commit(false)">更新する</button>
+    <button class="btn ghost" onclick="commit(true)">変化なし（確認済み）</button>
+    <button class="btn plain" onclick="closeSheet()">やめる</button>
+  </div>`;
+}
+
+function keepNote() {
+  if (!D) return;
+  const el = document.getElementById('note'); if (el) D.note = el.value;
+  const t = document.getElementById('ptext'); if (t) D.text = t.value;
+  const d = document.getElementById('pdept'); if (d) D.dept = d.value;
+}
+function openPlan(i) {
+  D = i < 0 ? { k: 'plan', idx: -1, kind: '手術', text: '', dept: '', res: [], when: '未定', status: '検討中' }
+            : { k: 'plan', idx: i, ...S.plans[i], res: [...S.plans[i].res] };
+  renderSheet();
+}
+function canDelete(p) { return S.role === 'nurse' || p.owner === S.role; }
+function togRes(r) { keepNote(); D.res = D.res.includes(r) ? D.res.filter(x => x !== r) : [...D.res, r]; D.err = null; renderSheet(); }
+function planText(p) { return `${p.kind}：${p.text}（${p.dept || '診療科未入力'}／${p.res.map(r => RES[r]).join('・') || '資源未選択'}／${p.when}／${p.status}）`; }
+function commitPlan() {
+  keepNote();
+  if (!D.text.trim()) { D.err = '内容を入力してください'; renderSheet(); return; }
+  const p = { kind: D.kind, text: D.text.trim(), dept: (D.dept || '').trim(), res: D.res, when: D.when, status: D.status, at: now(), by: ROLES[S.role].short, owner: D.idx < 0 ? S.role : S.plans[D.idx].owner };
+  if (D.idx < 0) S.plans.unshift(p); else S.plans[D.idx] = p;
+  S.log.unshift({ at: p.at, by: p.by, text: '予定' + (D.idx < 0 ? '追加' : '更新') + '：' + planText(p) });
+  save(); closeSheet(); render();
+}
+function endPlan() {
+  if (!canDelete(S.plans[D.idx])) return;
+  const p = S.plans.splice(D.idx, 1)[0];
+  S.log.unshift({ at: now(), by: ROLES[S.role].short, text: '予定終了：' + p.kind + '：' + p.text });
+  save(); closeSheet(); render();
+}
+function setD(f, v) { keepNote(); D[f] = v; D.err = null; if (f === 'level' && v !== 'y') D.wait = null; renderSheet(); }
+function num(f, d) { keepNote(); D[f] = Math.max(0, (D[f] || 0) + d); renderSheet(); }
+function bed(u, d) { D.n[u] = Math.max(0, D.n[u] + d); renderSheet(); }
+function closeSheet() { D = null; renderSheet(); }
+
+function commit(noChange) {
+  keepNote();
+  const proxy = S.role === 'nurse' && D.k !== 'beds';
+  const by = proxy ? '当直師長（代行）' : ROLES[S.role].short, at = now();
+  let text;
+  if (D.k === 'beds') {
+    if (!noChange) S.beds.n = { ...D.n };
+    S.beds.at = at; S.beds.by = by;
+    text = noChange ? '空床：変化なし（確認済み）' : '空床：' + BED_UNITS.flatMap(g => g.units).map(u => `${u} ${S.beds.n[u]}`).join('・');
+  } else {
+    const it = S.items[D.k], def = ITEMS[D.k];
+    if (!noChange) {
+      if (def.wait && D.level === 'y' && !D.wait) { D.err = '待ち時間の見込みを選んでください'; renderSheet(); return; }
+      const { k, at: _a, by: _b, err: _e, ...vals } = D;
+      Object.assign(it, vals, { note: D.note.trim() });
+    }
+    it.at = at; it.by = by;
+    if (noChange) text = `${def.name}：変化なし（確認済み）`;
+    else {
+      text = def.er ? `ER：${erText(it)}` : `${def.name}：${def.labels[it.level]}${it.level === 'y' && it.wait ? `（約${it.wait}）` : ''}`;
+      if (it.note) text += `／${it.note}`;
+    }
+  }
+  S.log.unshift({ at, by, text });
+  save(); closeSheet(); render();
+}
+
+function openNotice() { D = { k: 'notice', text: '' }; renderSheet(); }
+function postNotice() {
+  const v = document.getElementById('nt').value.trim();
+  if (!v) return;
+  const by = ROLES[S.role].short, at = now();
+  S.notices.unshift({ text: v, at, by });
+  S.log.unshift({ at, by, text: 'お知らせ：' + v });
+  save(); closeSheet(); render();
+}
+function removeNotice(i) {
+  const nt = S.notices.splice(i, 1)[0];
+  S.log.unshift({ at: now(), by: ROLES[S.role].short, text: 'お知らせ取り下げ：' + nt.text });
+  save(); D = { k: 'notice', text: document.getElementById('nt').value }; renderSheet(); render();
+}
+
+/* ===== 操作 ===== */
+function login(k) { S.role = k; tab = 'board'; save(); render(); }
+function logout() { S.role = null; save(); render(); }
+function go(k) { tab = k; render(); window.scrollTo(0, 0); }
+function advance() { S.offset = (S.offset || 0) + 3600000; save(); render(); }
+function resetDemo() { S = seed(S.role); save(); render(); }
+
+function themeLabel() {
+  const t = document.documentElement.dataset.theme;
+  return t === 'dark' ? '暗い画面' : t === 'light' ? '明るい画面' : '端末に合わせる';
+}
+function toggleTheme() {
+  const order = [undefined, 'dark', 'light'];
+  const cur = document.documentElement.dataset.theme;
+  const nx = order[(order.indexOf(cur) + 1) % order.length];
+  if (nx) document.documentElement.dataset.theme = nx; else delete document.documentElement.dataset.theme;
+  try { nx ? localStorage.setItem(KEY + '-theme', nx) : localStorage.removeItem(KEY + '-theme'); } catch (e) {}
+  render();
+}
+try { const t = localStorage.getItem(KEY + '-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+
+render();
+setInterval(() => { if (!D) render(); }, 30000);
+</script>
