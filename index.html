@@ -1,3 +1,11 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>当直ボード（試作）</title>
 <meta name="apple-mobile-web-app-title" content="当直ボード">
 <style>
@@ -6,15 +14,9 @@
   --bg:#f3f4f6; --card:#ffffff; --text:#1a1d23; --sub:#5f6672; --line:#e3e5e9;
   --g:#1f9d55; --g-bg:#e6f6ec; --y:#b07d00; --y-bg:#fff5d6; --r:#d23b3b; --r-bg:#fde8e8;
   --s:#7d838e; --s-bg:#eceef1; --accent:#1d5fbf; --accent-bg:#e7effb; --warn-bg:#fff3e0; --warn:#a85b00;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0f1115; --card:#1a1d24; --text:#eef0f3; --sub:#9aa1ad; --line:#2b2f38;
-    --g:#3ccf7a; --g-bg:#123222; --y:#f2c335; --y-bg:#352b0c; --r:#ff6b6b; --r-bg:#3a1717;
-    --s:#8a909b; --s-bg:#262a32; --accent:#7fb0ff; --accent-bg:#17253d; --warn-bg:#33240f; --warn:#ffb85c;
-    color-scheme:dark;
-  }
-}
+/* 端末が暗い設定でも、通常は明るい画面で表示する（暗い画面は「設定」で選べる） */
 :root[data-theme="dark"]{
   --bg:#0f1115; --card:#1a1d24; --text:#eef0f3; --sub:#9aa1ad; --line:#2b2f38;
   --g:#3ccf7a; --g-bg:#123222; --y:#f2c335; --y-bg:#352b0c; --r:#ff6b6b; --r-bg:#3a1717;
@@ -23,7 +25,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;font-size:15px;line-height:1.4;-webkit-text-size-adjust:100%}
-.app{max-width:460px;margin:0 auto;min-height:100vh;padding:0 16px calc(70px + env(safe-area-inset-bottom))}
+.app{max-width:460px;margin:0 auto;min-height:100vh;padding:0 16px calc(24px + env(safe-area-inset-bottom))}
 button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .demo-strip{background:var(--accent-bg);color:var(--accent);font-size:11px;text-align:center;padding:4px 8px;margin:0 -16px;font-weight:600}
@@ -87,11 +89,11 @@ header .clock div{font-size:11px;color:var(--sub)}
 .plan .detail{font-size:11px;color:var(--sub);margin-top:2px}
 .seg.wrap3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .seg button.tg{font-size:14px;padding:11px 2px}
-nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;max-width:153px;padding:7px 0 8px;font-size:11px;color:var(--sub);font-weight:600}
-nav button b{display:block;font-size:18px;line-height:1.2}
-nav button.on{color:var(--accent)}
-.fab{position:fixed;right:max(14px,calc(50% - 216px));bottom:calc(64px + env(safe-area-inset-bottom));background:var(--accent);color:#fff;border-radius:999px;padding:10px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+nav{display:flex;gap:6px;margin:2px 0 8px}
+nav button{flex:1;min-width:0;padding:9px 0;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:12.5px;color:var(--sub);font-weight:700;white-space:nowrap}
+nav button b{font-size:14px;margin-right:3px}
+nav button.on{color:var(--accent);border-color:var(--accent);background:var(--accent-bg)}
+nav button.add{color:#fff;background:var(--accent);border-color:var(--accent)}
 /* 入力シート */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
 .sheet{background:var(--card);width:100%;max-width:460px;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
@@ -246,7 +248,8 @@ function render() {
   const app = document.getElementById('app');
   if (!S.role) { app.innerHTML = loginView(); return; }
   const body = tab === 'board' ? boardView() : tab === 'log' ? logView() : settingsView();
-  app.innerHTML = `<div class="demo-strip">試作品：表示はすべて見本データです</div>` + body + navView() + fabView();
+  // 状況画面では空床の直下に、履歴・設定の画面では見出しの直下にメニューを置く
+  app.innerHTML = `<div class="demo-strip">試作品：表示はすべて見本データです</div>` + (tab === 'board' ? body : navView() + body);
 }
 
 function loginView() {
@@ -336,6 +339,8 @@ function boardView() {
   }
   h += `</div></div>`;
 
+  h += navView();
+
   h += `<div class="legend">● 緑＝余裕　▲ 黄＝要注意　✕ 赤＝不可・満床　－ 灰＝未更新<br>未更新＝定時（${TEIJI.join('・')}時）から${GRACE_MIN}分過ぎても更新なし<br>空き床数：0床＝赤・1床＝黄・2床以上＝緑（仮）<br>予定の状態：検討中＝青・決定＝黄・実施中＝赤／「要確認」＝更新から3時間以上</div>`;
   return h;
 }
@@ -378,13 +383,8 @@ function settingsView() {
 
 function navView() {
   const b = (k, icon, label) => `<button class="${tab === k ? 'on' : ''}" onclick="go('${k}')"><b>${icon}</b>${label}</button>`;
-  return `<nav>${b('board', '▦', '状況')}${b('log', '☰', '履歴')}${b('settings', '⚙', '設定')}</nav>`;
-}
-
-function fabView() {
-  const role = ROLES[S.role];
-  if (tab !== 'board' || !role.notice) return '';
-  return `<button class="fab" onclick="openNotice()">＋ お知らせ</button>`;
+  const add = tab === 'board' && ROLES[S.role].notice ? `<button class="add" onclick="openNotice()">＋ お知らせ</button>` : '';
+  return `<nav>${b('board', '▦', '状況')}${b('log', '☰', '履歴')}${b('settings', '⚙', '設定')}${add}</nav>`;
 }
 
 /* ===== 入力シート ===== */
@@ -565,14 +565,12 @@ function resetDemo() { S = seed(S.role); save(); render(); }
 
 function themeLabel() {
   const t = document.documentElement.dataset.theme;
-  return t === 'dark' ? '暗い画面' : t === 'light' ? '明るい画面' : '端末に合わせる';
+  return t === 'dark' ? '暗い画面' : '明るい画面';
 }
 function toggleTheme() {
-  const order = [undefined, 'dark', 'light'];
-  const cur = document.documentElement.dataset.theme;
-  const nx = order[(order.indexOf(cur) + 1) % order.length];
-  if (nx) document.documentElement.dataset.theme = nx; else delete document.documentElement.dataset.theme;
-  try { nx ? localStorage.setItem(KEY + '-theme', nx) : localStorage.removeItem(KEY + '-theme'); } catch (e) {}
+  const nx = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = nx;
+  try { localStorage.setItem(KEY + '-theme', nx); } catch (e) {}
   render();
 }
 try { const t = localStorage.getItem(KEY + '-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
@@ -580,3 +578,5 @@ try { const t = localStorage.getItem(KEY + '-theme'); if (t) document.documentEl
 render();
 setInterval(() => { if (!D) render(); }, 30000);
 </script>
+</body>
+</html>
